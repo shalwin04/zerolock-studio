@@ -7,15 +7,33 @@ import { CHAT_TOOLS } from './tools';
 
 // Get the base URL for API calls (handles both dev and production)
 function getBaseUrl(): string {
-  // Server-side: use NEXTAUTH_URL or construct from environment
-  if (process.env.NEXTAUTH_URL) {
-    return process.env.NEXTAUTH_URL;
+  // Priority 1: Explicit app URL (set in Vercel env vars)
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, ''); // Remove trailing slash
   }
+
+  // Priority 2: Vercel's auto-generated URL
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
   }
+
+  // Priority 3: Vercel branch URL
+  if (process.env.VERCEL_BRANCH_URL) {
+    return `https://${process.env.VERCEL_BRANCH_URL}`;
+  }
+
+  // Priority 4: NextAuth URL (if using NextAuth)
+  if (process.env.NEXTAUTH_URL) {
+    return process.env.NEXTAUTH_URL.replace(/\/$/, '');
+  }
+
+  // Priority 5: Custom base URL
+  if (process.env.NEXT_PUBLIC_BASE_URL) {
+    return process.env.NEXT_PUBLIC_BASE_URL.replace(/\/$/, '');
+  }
+
   // Default for local development
-  return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  return 'http://localhost:3000';
 }
 
 // System prompt for the chat agent
@@ -356,11 +374,27 @@ export async function executeTool(
       }
 
       case 'discoverSchema': {
-        const response = await fetch(`${baseUrl}/api/schema/discover`, {
+        const url = `${baseUrl}/api/schema/discover`;
+        console.log('[discoverSchema] Fetching:', url);
+
+        const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ forceRefresh: args.forceRefresh || false }),
         });
+
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await response.text();
+          console.error('[discoverSchema] Non-JSON response:', text.slice(0, 200));
+          return {
+            success: false,
+            result: null,
+            error: `API returned non-JSON response (status: ${response.status}). URL: ${url}`,
+          };
+        }
+
         const data = await response.json();
 
         if (!data.success) {
