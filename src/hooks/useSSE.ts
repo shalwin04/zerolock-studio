@@ -6,18 +6,10 @@ import { TelemetryEvent, TelemetryMetrics, BackoffAnalysis } from '@/types/telem
 interface SSEState {
   connected: boolean;
   events: TelemetryEvent[];
-  metrics: TelemetryMetrics | null;
+  metrics: Partial<TelemetryMetrics> | null;
   backoffAnalysis: BackoffAnalysis | null;
   error: string | null;
 }
-
-const initialMetrics: TelemetryMetrics = {
-  conflictsPerSec: 0,
-  avgLatencyMs: 0,
-  throughput: 0,
-  successRate: 1,
-  retryRate: 0,
-};
 
 export function useSSE(executionId: string | null) {
   const [state, setState] = useState<SSEState>({
@@ -51,7 +43,7 @@ export function useSSE(executionId: string | null) {
     });
 
     eventSource.addEventListener('metrics', (e) => {
-      const metrics = JSON.parse(e.data) as TelemetryMetrics;
+      const metrics = JSON.parse(e.data) as Partial<TelemetryMetrics>;
       setState((prev) => ({
         ...prev,
         metrics,

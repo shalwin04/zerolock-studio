@@ -102,7 +102,7 @@ export function recordEvent(event: TelemetryEvent): void {
   }
 }
 
-export function getCurrentMetrics(): TelemetryMetrics {
+export function getCurrentMetrics(): Partial<TelemetryMetrics> {
   const now = Date.now();
   const recentWindows = metricsWindows.filter(
     (w) => now - w.windowStart < 10000 // Last 10 seconds
@@ -136,6 +136,9 @@ export function getCurrentMetrics(): TelemetryMetrics {
         ? Math.max(0, (totalTransactions - totalConflicts) / totalTransactions)
         : 1,
     retryRate: totalTransactions > 0 ? totalRetries / totalTransactions : 0,
+    totalTransactions,
+    totalConflicts,
+    totalRetries,
   };
 }
 
@@ -310,7 +313,7 @@ function percentile(sorted: number[], p: number): number {
 
 export function getHistoricalMetrics(
   secondsBack: number
-): Array<{ timestamp: number; metrics: TelemetryMetrics }> {
+): Array<{ timestamp: number; metrics: Partial<TelemetryMetrics> }> {
   const now = Date.now();
   const cutoff = now - secondsBack * 1000;
 

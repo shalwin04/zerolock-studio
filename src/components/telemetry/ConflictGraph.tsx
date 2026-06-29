@@ -21,9 +21,9 @@ export function ConflictGraph() {
   const chartData = useMemo(() => {
     return metricsHistory.map((item, index) => ({
       time: index,
-      conflicts: item.metrics.conflictsPerSec.toFixed(1),
-      throughput: item.metrics.throughput.toFixed(1),
-      latency: item.metrics.avgLatencyMs.toFixed(0),
+      conflicts: (item.metrics.conflictsPerSec ?? 0).toFixed(1),
+      throughput: (item.metrics.throughput ?? 0).toFixed(1),
+      latency: (item.metrics.avgLatencyMs ?? 0).toFixed(0),
     }));
   }, [metricsHistory]);
 

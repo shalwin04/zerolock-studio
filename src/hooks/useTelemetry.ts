@@ -21,7 +21,7 @@ interface TelemetryState {
   backoffAnalysis: BackoffAnalysis | null;
 
   // Historical data for charts
-  metricsHistory: Array<{ timestamp: number; metrics: TelemetryMetrics }>;
+  metricsHistory: Array<{ timestamp: number; metrics: Partial<TelemetryMetrics> }>;
 
   // Summary after completion
   summary: ExecutionSummary | null;
@@ -34,7 +34,7 @@ interface TelemetryState {
   // Actions
   startExecution: (executionId: string) => void;
   addEvent: (event: TelemetryEvent) => void;
-  updateMetrics: (metrics: TelemetryMetrics) => void;
+  updateMetrics: (metrics: Partial<TelemetryMetrics>) => void;
   addBackoffData: (data: BackoffDataPoint) => void;
   setBackoffAnalysis: (analysis: BackoffAnalysis) => void;
   finishExecution: (summary: ExecutionSummary) => void;
@@ -42,11 +42,38 @@ interface TelemetryState {
 }
 
 const initialMetrics: TelemetryMetrics = {
+  // Core metrics
   conflictsPerSec: 0,
   avgLatencyMs: 0,
   throughput: 0,
   successRate: 1,
   retryRate: 0,
+
+  // Latency percentiles
+  p50LatencyMs: 0,
+  p95LatencyMs: 0,
+  p99LatencyMs: 0,
+
+  // Transaction counts
+  totalTransactions: 0,
+  committedCount: 0,
+  abortedCount: 0,
+  totalConflicts: 0,
+  totalRetries: 0,
+
+  // Timing
+  totalDurationMs: 0,
+  avgTransactionMs: 0,
+
+  // Concurrency
+  concurrentThreads: 1,
+  peakConcurrency: 1,
+
+  // Hotspots
+  conflictHotspots: [],
+
+  // Retry distribution
+  retryDistribution: [],
 };
 
 export const useTelemetryStore = create<TelemetryState>((set, get) => ({
@@ -99,14 +126,17 @@ export const useTelemetryStore = create<TelemetryState>((set, get) => ({
     });
   },
 
-  updateMetrics: (metrics) => {
-    set((state) => ({
-      metrics,
-      metricsHistory: [
-        ...state.metricsHistory.slice(-59),
-        { timestamp: Date.now(), metrics },
-      ],
-    }));
+  updateMetrics: (partialMetrics) => {
+    set((state) => {
+      const mergedMetrics = { ...state.metrics, ...partialMetrics };
+      return {
+        metrics: mergedMetrics,
+        metricsHistory: [
+          ...state.metricsHistory.slice(-59),
+          { timestamp: Date.now(), metrics: mergedMetrics },
+        ],
+      };
+    });
   },
 
   addBackoffData: (data) => {

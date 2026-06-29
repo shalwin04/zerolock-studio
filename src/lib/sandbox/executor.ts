@@ -11,6 +11,13 @@ import {
   BackoffDataPoint,
 } from '@/types/telemetry';
 import { DSQLError, parseDSQLError, isDSQLRetryableError } from '@/types/dsql';
+import {
+  startTransaction as monitorStartTransaction,
+  recordQuery as monitorRecordQuery,
+  recordConflict as monitorRecordConflict,
+  recordRetry as monitorRecordRetry,
+  endTransaction as monitorEndTransaction,
+} from '@/lib/dsql/monitor';
 
 export interface ExecutionRequest {
   code: string;
@@ -303,10 +310,20 @@ async function executeSQLWithChaos(
   let totalLatency = 0;
   let rowsAffected = 0;
 
-  emitEvent({
+  const startEvent: TelemetryEvent = {
     txnId,
     timestamp: Date.now(),
     type: 'start',
+  };
+  emitEvent(startEvent);
+  // Also emit to monitor for SSE streaming
+  monitorStartTransaction({
+    txnId,
+    status: 'active',
+    startedAt: Date.now(),
+    isolationLevel: 'repeatable_read',
+    readOnly: false,
+    queryCount: 0,
   });
 
   // Split SQL into statements
@@ -333,14 +350,21 @@ async function executeSQLWithChaos(
       // Maybe inject synthetic conflict
       if (chaosConfig.enabled && Math.random() * 100 < chaosConfig.conflictProbability) {
         conflictCount++;
-        emitEvent({
+        const conflictEvent: TelemetryEvent = {
           txnId,
           timestamp: Date.now(),
           type: 'conflict',
           code: '40001',
           subcode: 'OC000',
           message: 'Synthetic conflict injected by chaos',
-        });
+        };
+        emitEvent(conflictEvent);
+        monitorRecordConflict(txnId, {
+          code: '40001',
+          message: 'Synthetic conflict injected by chaos',
+          severity: 'ERROR',
+          isRetryable: true,
+        }, statement.substring(0, 50));
 
         // If we're injecting conflicts, simulate retry
         retryCount++;
@@ -359,6 +383,7 @@ async function executeSQLWithChaos(
           delayMs: delay,
           reason: 'Synthetic conflict',
         });
+        monitorRecordRetry(txnId, retryCount, delay, 'Synthetic conflict');
         await sleep(delay);
       }
 
@@ -380,6 +405,7 @@ async function executeSQLWithChaos(
           durationMs: duration,
           rowCount: result.rowCount || 0,
         });
+        monitorRecordQuery(txnId, statement.substring(0, 100), duration, result.rowCount || 0);
 
         results.push(result.rows);
       } catch (error) {
@@ -395,6 +421,7 @@ async function executeSQLWithChaos(
             subcode: dsqlError.dsqlCode,
             message: dsqlError.message,
           });
+          monitorRecordConflict(txnId, dsqlError, statement.substring(0, 50));
         }
         throw error;
       }
@@ -405,13 +432,15 @@ async function executeSQLWithChaos(
       await client.query('COMMIT');
     }
 
+    const commitTime = Date.now();
     emitEvent({
       txnId,
-      timestamp: Date.now(),
+      timestamp: commitTime,
       type: 'commit',
-      totalMs: Date.now() - (emitEvent as any).startTime || Date.now(),
+      totalMs: totalLatency,
       retryCount,
     });
+    monitorEndTransaction(txnId, 'commit');
 
     return {
       rows: results.flat(),
@@ -431,9 +460,10 @@ async function executeSQLWithChaos(
       txnId,
       timestamp: Date.now(),
       type: 'abort',
-      totalMs: Date.now() - (emitEvent as any).startTime || Date.now(),
+      totalMs: totalLatency,
       retryCount,
     });
+    monitorEndTransaction(txnId, 'abort');
 
     throw error;
   } finally {
@@ -560,6 +590,14 @@ async function executeTransferWithRetry(
   let rowsAffected = 0;
 
   emitEvent({ txnId, timestamp: Date.now(), type: 'start' });
+  monitorStartTransaction({
+    txnId,
+    status: 'active',
+    startedAt: Date.now(),
+    isolationLevel: 'repeatable_read',
+    readOnly: false,
+    queryCount: 0,
+  });
 
   while (attempt <= MAX_RETRIES) {
     try {
@@ -626,6 +664,7 @@ async function executeTransferWithRetry(
         totalMs: totalLatency,
         retryCount: attempt,
       });
+      monitorEndTransaction(txnId, 'commit');
 
       return {
         output: { transferred: amount, from: fromId, to: toId, success: true },
@@ -651,6 +690,12 @@ async function executeTransferWithRetry(
           subcode: 'OC000',
           message: error.message,
         });
+        monitorRecordConflict(txnId, {
+          code: '40001',
+          message: error.message,
+          severity: 'ERROR',
+          isRetryable: true,
+        }, 'accounts');
 
         // Full jitter exponential backoff
         const maxDelay = Math.min(MAX_DELAY, BASE_DELAY * Math.pow(2, attempt));
@@ -671,6 +716,7 @@ async function executeTransferWithRetry(
           delayMs: delay,
           reason: error.message,
         });
+        monitorRecordRetry(txnId, attempt, delay, error.message);
 
         await sleep(delay);
         continue;
@@ -683,6 +729,7 @@ async function executeTransferWithRetry(
         totalMs: totalLatency,
         retryCount: attempt,
       });
+      monitorEndTransaction(txnId, 'abort');
 
       throw error;
     }
@@ -718,6 +765,14 @@ async function executeCounterIncrementWithRetry(
   let totalLatency = 0;
 
   emitEvent({ txnId, timestamp: Date.now(), type: 'start' });
+  monitorStartTransaction({
+    txnId,
+    status: 'active',
+    startedAt: Date.now(),
+    isolationLevel: 'repeatable_read',
+    readOnly: false,
+    queryCount: 0,
+  });
 
   while (attempt <= MAX_RETRIES) {
     try {
@@ -744,14 +799,16 @@ async function executeCounterIncrementWithRetry(
       totalLatency += Date.now() - start;
       queryCount++;
 
+      const queryDuration = Date.now() - start;
       emitEvent({
         txnId,
         timestamp: Date.now(),
         type: 'query',
         sql: 'UPDATE counters SET value = value + 1',
-        durationMs: Date.now() - start,
+        durationMs: queryDuration,
         rowCount: result.rowCount || 0,
       });
+      monitorRecordQuery(txnId, 'UPDATE counters SET value = value + 1', queryDuration, result.rowCount || 0);
 
       emitEvent({
         txnId,
@@ -760,6 +817,7 @@ async function executeCounterIncrementWithRetry(
         totalMs: totalLatency,
         retryCount: attempt,
       });
+      monitorEndTransaction(txnId, 'commit');
 
       return {
         output: { newValue: result.rows[0]?.value, success: true },
@@ -785,6 +843,12 @@ async function executeCounterIncrementWithRetry(
           subcode: 'OC000',
           message: error.message,
         });
+        monitorRecordConflict(txnId, {
+          code: '40001',
+          message: error.message,
+          severity: 'ERROR',
+          isRetryable: true,
+        }, 'counters');
 
         // Full jitter exponential backoff
         const maxDelay = Math.min(MAX_DELAY, BASE_DELAY * Math.pow(2, attempt));
@@ -805,6 +869,7 @@ async function executeCounterIncrementWithRetry(
           delayMs: delay,
           reason: error.message,
         });
+        monitorRecordRetry(txnId, attempt, delay, error.message);
 
         await sleep(delay);
         continue;
@@ -818,6 +883,7 @@ async function executeCounterIncrementWithRetry(
         totalMs: totalLatency,
         retryCount: attempt,
       });
+      monitorEndTransaction(txnId, 'abort');
 
       throw error;
     }

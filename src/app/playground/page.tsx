@@ -8,6 +8,7 @@ import { ConflictGraph } from '@/components/telemetry/ConflictGraph';
 import { BackoffHeatmap } from '@/components/telemetry/BackoffHeatmap';
 import { MetricsPanel } from '@/components/telemetry/MetricsPanel';
 import { EventLog } from '@/components/telemetry/EventLog';
+import { InsightsPanel } from '@/components/telemetry/InsightsPanel';
 import { SchemaExplorer } from '@/components/schema/SchemaExplorer';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { TransactionBuilder } from '@/components/builder/TransactionBuilder';
@@ -24,8 +25,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
-import { TelemetryEvent, BackoffDataPoint, BackoffAnalysis } from '@/types/telemetry';
+import { TelemetryEvent, BackoffDataPoint, BackoffAnalysis, TelemetryMetrics } from '@/types/telemetry';
 import { MessageSquare, Database, Blocks, PanelRightClose, PanelRight, Maximize2, Minimize2, Zap, ArrowLeft } from 'lucide-react';
+import { useStreamingExecution } from '@/hooks/useStreamingExecution';
 
 // Generate metrics history from events for chart visualization
 function generateMetricsHistory(
@@ -178,6 +180,9 @@ export default function PlaygroundPage() {
   const telemetryMetrics = useTelemetryStore((state) => state.metrics);
   const schemaTables = useSchemaStore((state) => state.tables);
 
+  // Streaming execution hook for real-time updates
+  const { execute: streamingExecute } = useStreamingExecution();
+
   // Build chat context from current state
   const chatContext = useMemo<ChatContext>(() => ({
     editorCode: code,
@@ -289,17 +294,70 @@ export default function PlaygroundPage() {
             updateMetrics(point.metrics);
           }
 
-          // Also update with final metrics
+          // Calculate latency percentiles from events
+          const builderLatencies = (data.events || [])
+            .filter((e: TelemetryEvent) => e.type === 'commit' || e.type === 'abort')
+            .map((e: TelemetryEvent & { totalMs?: number }) => e.totalMs || 0)
+            .filter((l: number) => l > 0)
+            .sort((a: number, b: number) => a - b);
+
+          const builderP50 = builderLatencies.length > 0 ? builderLatencies[Math.floor(builderLatencies.length * 0.5)] : data.result.avgLatency;
+          const builderP95 = builderLatencies.length > 0 ? builderLatencies[Math.floor(builderLatencies.length * 0.95)] : data.result.avgLatency * 1.5;
+          const builderP99 = builderLatencies.length > 0 ? builderLatencies[Math.floor(builderLatencies.length * 0.99)] : data.result.avgLatency * 2;
+
+          // Calculate retry distribution
+          const builderRetryMap = new Map<number, number>();
+          (data.events || [])
+            .filter((e: TelemetryEvent) => e.type === 'retry')
+            .forEach((e: TelemetryEvent & { attempt?: number }) => {
+              const attempt = e.attempt || 1;
+              builderRetryMap.set(attempt, (builderRetryMap.get(attempt) || 0) + 1);
+            });
+          const builderRetryDistribution = Array.from(builderRetryMap.entries())
+            .map(([attempts, count]) => ({ attempts, count }))
+            .sort((a, b) => a.attempts - b.attempts);
+
+          // Calculate conflict hotspots
+          const builderHotspotMap = new Map<string, number>();
+          (data.events || [])
+            .filter((e: TelemetryEvent) => e.type === 'conflict')
+            .forEach((e: TelemetryEvent & { key?: string }) => {
+              const key = e.key || 'unknown';
+              builderHotspotMap.set(key, (builderHotspotMap.get(key) || 0) + 1);
+            });
+          const builderConflictHotspots = Array.from(builderHotspotMap.entries())
+            .map(([key, count]) => ({ key, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+
+          const builderDurationSec = data.result.duration / 1000;
+          const effectiveThreads = concurrentUsers || chaosConfig.concurrentThreads || 1;
+
+          // Update with comprehensive final metrics
           updateMetrics({
-            conflictsPerSec: data.result.conflictCount / (data.result.duration / 1000),
+            conflictsPerSec: data.result.conflictCount / builderDurationSec,
             avgLatencyMs: data.result.avgLatency,
-            throughput: data.result.transactionCount / (data.result.duration / 1000),
+            throughput: data.result.transactionCount / builderDurationSec,
             successRate: data.result.transactionCount > 0
               ? (data.result.transactionCount - data.result.conflictCount) / data.result.transactionCount
               : 1,
             retryRate: data.result.transactionCount > 0
               ? data.result.retryCount / data.result.transactionCount
               : 0,
+            p50LatencyMs: builderP50,
+            p95LatencyMs: builderP95,
+            p99LatencyMs: builderP99,
+            totalTransactions: data.result.transactionCount,
+            committedCount: data.result.transactionCount - data.result.conflictCount,
+            abortedCount: data.result.conflictCount,
+            totalConflicts: data.result.conflictCount,
+            totalRetries: data.result.retryCount,
+            totalDurationMs: data.result.duration,
+            avgTransactionMs: data.result.avgLatency,
+            concurrentThreads: effectiveThreads,
+            peakConcurrency: effectiveThreads,
+            conflictHotspots: builderConflictHotspots,
+            retryDistribution: builderRetryDistribution,
           });
         }
 
@@ -394,124 +452,111 @@ export default function PlaygroundPage() {
     if (!code.trim()) return;
     reset();
 
-    try {
-      const connectionConfig = getConnectionConfig();
-      const response = await fetch('/api/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code,
-          language,
-          chaosConfig,
-          connection: connectionConfig || undefined,
-        }),
-      });
+    const connectionConfig = getConnectionConfig();
+    const execId = `exec_${Date.now()}`;
+    startExecution(execId);
+    setExecutionId(execId);
 
-      const data = await response.json();
+    const collectedBackoff: BackoffDataPoint[] = [];
 
-      if (data.success) {
-        startExecution(data.executionId);
-        setExecutionId(data.executionId);
-
-        if (data.events && Array.isArray(data.events)) {
-          for (const event of data.events) {
-            addEvent(event);
-            if (event.type === 'retry' && 'delayMs' in event) {
-              addBackoffData({
-                attempt: event.attempt,
-                delayMs: event.delayMs,
-                timestamp: event.timestamp,
-                txnId: event.txnId,
-              });
+    await streamingExecute(
+      {
+        code,
+        language,
+        chaosConfig,
+        connection: connectionConfig || undefined,
+      },
+      {
+        onEvent: (event) => {
+          addEvent(event);
+        },
+        onMetrics: (metrics) => {
+          updateMetrics(metrics);
+        },
+        onBackoffData: (data) => {
+          addBackoffData(data);
+          collectedBackoff.push(data);
+        },
+        onComplete: (result) => {
+          if (result.success && result.result) {
+            // Apply final metrics
+            if (result.finalMetrics) {
+              updateMetrics(result.finalMetrics);
             }
-          }
-        }
 
-        if (data.backoffData && Array.isArray(data.backoffData)) {
-          for (const point of data.backoffData) {
-            addBackoffData(point);
-          }
-        }
+            // Analyze backoff pattern
+            const realBackoffAnalysis = analyzeBackoffPattern(collectedBackoff);
+            setBackoffAnalysis(realBackoffAnalysis);
 
-        if (data.result) {
-          // Generate and add metrics history for chart visualization
-          const metricsHistory = generateMetricsHistory(
-            data.events || [],
-            data.result
-          );
-          for (const point of metricsHistory) {
-            updateMetrics(point.metrics);
-          }
+            toast.success('Execution completed', {
+              description: `${result.result.transactionCount} transactions, ${result.result.conflictCount} conflicts`,
+            });
 
-          // Also update with final metrics
-          updateMetrics({
-            conflictsPerSec: data.result.conflictCount / (data.result.duration / 1000),
-            avgLatencyMs: data.result.avgLatency,
-            throughput: data.result.transactionCount / (data.result.duration / 1000),
-            successRate: data.result.transactionCount > 0
-              ? (data.result.transactionCount - data.result.conflictCount) / data.result.transactionCount
-              : 1,
-            retryRate: data.result.transactionCount > 0
-              ? data.result.retryCount / data.result.transactionCount
-              : 0,
+            finishExecution({
+              executionId: result.executionId,
+              startTime: Date.now() - result.result.duration,
+              endTime: Date.now(),
+              totalTransactions: result.result.transactionCount,
+              committedCount: result.result.transactionCount - result.result.conflictCount,
+              abortedCount: result.result.conflictCount,
+              totalConflicts: result.result.conflictCount,
+              totalRetries: result.result.retryCount,
+              avgLatencyMs: result.result.avgLatency,
+              p50LatencyMs: result.finalMetrics?.p50LatencyMs || result.result.avgLatency,
+              p95LatencyMs: result.finalMetrics?.p95LatencyMs || result.result.avgLatency * 1.5,
+              p99LatencyMs: result.finalMetrics?.p99LatencyMs || result.result.avgLatency * 2,
+              throughput: result.result.transactionCount / (result.result.duration / 1000),
+              backoffAnalysis: realBackoffAnalysis,
+              integrityChecks: [],
+            });
+          } else {
+            toast.error('Execution failed', {
+              description: result.error?.message || 'Unknown error',
+            });
+            finishExecution({
+              executionId: result.executionId,
+              startTime: Date.now(),
+              endTime: Date.now(),
+              totalTransactions: 0,
+              committedCount: 0,
+              abortedCount: 0,
+              totalConflicts: 0,
+              totalRetries: 0,
+              avgLatencyMs: 0,
+              p50LatencyMs: 0,
+              p95LatencyMs: 0,
+              p99LatencyMs: 0,
+              throughput: 0,
+              backoffAnalysis: { isExponential: true, hasJitter: true, baseDelay: 50, multiplier: 2, maxDelay: 5000, retryStormRisk: 'low' },
+              integrityChecks: [],
+            });
+          }
+        },
+        onError: (error) => {
+          toast.error('Connection error', {
+            description: error,
           });
-        }
-
-        toast.success('Execution completed', {
-          description: `${data.result.transactionCount} transactions, ${data.result.conflictCount} conflicts`,
-        });
-
-        // Collect all backoff data from the response
-        const collectedBackoff: BackoffDataPoint[] = [];
-        if (data.backoffData && Array.isArray(data.backoffData)) {
-          collectedBackoff.push(...data.backoffData);
-        }
-        // Also extract from events
-        if (data.events && Array.isArray(data.events)) {
-          for (const event of data.events) {
-            if (event.type === 'retry' && 'delayMs' in event) {
-              collectedBackoff.push({
-                attempt: event.attempt,
-                delayMs: event.delayMs,
-                timestamp: event.timestamp,
-                txnId: event.txnId,
-              });
-            }
-          }
-        }
-
-        // Use real backoff analysis
-        const realBackoffAnalysis = analyzeBackoffPattern(collectedBackoff);
-        setBackoffAnalysis(realBackoffAnalysis);
-
-        finishExecution({
-          executionId: data.executionId,
-          startTime: Date.now() - data.result.duration,
-          endTime: Date.now(),
-          totalTransactions: data.result.transactionCount,
-          committedCount: data.result.transactionCount - data.result.conflictCount,
-          abortedCount: data.result.conflictCount,
-          totalConflicts: data.result.conflictCount,
-          totalRetries: data.result.retryCount,
-          avgLatencyMs: data.result.avgLatency,
-          p50LatencyMs: data.result.avgLatency,
-          p95LatencyMs: data.result.avgLatency * 1.5,
-          p99LatencyMs: data.result.avgLatency * 2,
-          throughput: data.result.transactionCount / (data.result.duration / 1000),
-          backoffAnalysis: realBackoffAnalysis,
-          integrityChecks: [],
-        });
-      } else {
-        toast.error('Execution failed', {
-          description: data.error?.message || 'Unknown error',
-        });
+          finishExecution({
+            executionId: execId,
+            startTime: Date.now(),
+            endTime: Date.now(),
+            totalTransactions: 0,
+            committedCount: 0,
+            abortedCount: 0,
+            totalConflicts: 0,
+            totalRetries: 0,
+            avgLatencyMs: 0,
+            p50LatencyMs: 0,
+            p95LatencyMs: 0,
+            p99LatencyMs: 0,
+            throughput: 0,
+            backoffAnalysis: { isExponential: true, hasJitter: true, baseDelay: 50, multiplier: 2, maxDelay: 5000, retryStormRisk: 'low' },
+            integrityChecks: [],
+          });
+        },
       }
-    } catch (error) {
-      toast.error('Connection error', {
-        description: error instanceof Error ? error.message : 'Failed to connect',
-      });
-    }
-  }, [code, language, chaosConfig, reset, startExecution, addEvent, addBackoffData, updateMetrics, finishExecution, getConnectionConfig]);
+    );
+  }, [code, language, chaosConfig, reset, startExecution, addEvent, addBackoffData, updateMetrics, setBackoffAnalysis, finishExecution, getConnectionConfig, streamingExecute]);
 
   return (
     <div className="h-screen flex flex-col bg-black">
@@ -594,12 +639,16 @@ export default function PlaygroundPage() {
         {/* Telemetry */}
         {!(assistantExpanded && assistantOpen) && (
           <div className="lg:col-span-1 min-h-0">
-            <Tabs defaultValue="conflicts" className="h-full flex flex-col">
+            <Tabs defaultValue="insights" className="h-full flex flex-col">
               <TabsList className="shrink-0 bg-white/[0.02] border border-white/[0.06] rounded-lg p-0.5">
-                <TabsTrigger value="conflicts" className="text-xs text-white/40 data-[state=active]:bg-white/5 data-[state=active]:text-white/90 rounded-md">Conflicts</TabsTrigger>
+                <TabsTrigger value="insights" className="text-xs text-white/40 data-[state=active]:bg-white/5 data-[state=active]:text-white/90 rounded-md">Insights</TabsTrigger>
+                <TabsTrigger value="conflicts" className="text-xs text-white/40 data-[state=active]:bg-white/5 data-[state=active]:text-white/90 rounded-md">Graph</TabsTrigger>
                 <TabsTrigger value="backoff" className="text-xs text-white/40 data-[state=active]:bg-white/5 data-[state=active]:text-white/90 rounded-md">Backoff</TabsTrigger>
                 <TabsTrigger value="events" className="text-xs text-white/40 data-[state=active]:bg-white/5 data-[state=active]:text-white/90 rounded-md">Events</TabsTrigger>
               </TabsList>
+              <TabsContent value="insights" className="flex-1 min-h-0 mt-2">
+                <InsightsPanel />
+              </TabsContent>
               <TabsContent value="conflicts" className="flex-1 min-h-0 mt-2">
                 <ConflictGraph />
               </TabsContent>

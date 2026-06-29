@@ -50,11 +50,38 @@ export type TelemetryEvent =
   | TransactionEndEvent;
 
 export interface TelemetryMetrics {
+  // Core metrics
   conflictsPerSec: number;
   avgLatencyMs: number;
   throughput: number; // transactions per second
   successRate: number; // 0-1
   retryRate: number; // average retries per transaction
+
+  // Latency percentiles
+  p50LatencyMs: number;
+  p95LatencyMs: number;
+  p99LatencyMs: number;
+
+  // Transaction counts
+  totalTransactions: number;
+  committedCount: number;
+  abortedCount: number;
+  totalConflicts: number;
+  totalRetries: number;
+
+  // Timing
+  totalDurationMs: number;
+  avgTransactionMs: number;
+
+  // Concurrency
+  concurrentThreads: number;
+  peakConcurrency: number;
+
+  // Hotspots (which keys conflict most)
+  conflictHotspots: { key: string; count: number }[];
+
+  // Retry distribution
+  retryDistribution: { attempts: number; count: number }[];
 }
 
 export interface BackoffDataPoint {
