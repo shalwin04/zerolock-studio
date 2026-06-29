@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a0a"/>
+      <stop offset="100%" style="stop-color:#1a1a2e"/>
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a1a"/>
+      <stop offset="100%" style="stop-color:#0d0d0d"/>
+    </linearGradient>
+    <linearGradient id="awsGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF9900"/>
+      <stop offset="100%" style="stop-color:#CC7A00"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="800" fill="url(#bgGrad)"/>
+
+  <!-- Grid pattern -->
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+  </pattern>
+  <rect width="1200" height="800" fill="url(#grid)"/>
+
+  <!-- Title -->
+  <text x="600" y="45" text-anchor="middle" fill="white" font-family="Inter, system-ui, sans-serif" font-size="28" font-weight="700">Zero-Lock Studio Architecture</text>
+  <text x="600" y="70" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="Inter, system-ui, sans-serif" font-size="14">Interactive Sandbox for Aurora DSQL Optimistic Concurrency Control</text>
+
+  <!-- Frontend Section -->
+  <rect x="50" y="100" width="500" height="220" rx="16" fill="url(#cardGrad)" stroke="rgba(255,255,255,0.1)" stroke-width="1" filter="url(#shadow)"/>
+  <text x="70" y="130" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="600" letter-spacing="1">FRONTEND</text>
+  <text x="70" y="155" fill="white" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="600">React + Next.js 15</text>
+
+  <!-- Frontend Components -->
+  <rect x="70" y="175" width="110" height="60" rx="8" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)"/>
+  <text x="125" y="200" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="500">Code Editor</text>
+  <text x="125" y="218" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="9">Monaco</text>
+
+  <rect x="190" y="175" width="110" height="60" rx="8" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)"/>
+  <text x="245" y="200" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="500">Chaos Panel</text>
+  <text x="245" y="218" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="9">Controls</text>
+
+  <rect x="310" y="175" width="110" height="60" rx="8" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)"/>
+  <text x="365" y="200" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="500">Telemetry</text>
+  <text x="365" y="218" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="9">Recharts</text>
+
+  <rect x="430" y="175" width="100" height="60" rx="8" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)"/>
+  <text x="480" y="200" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="500">Assistant</text>
+  <text x="480" y="218" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="9">AI Chat</text>
+
+  <!-- State Management -->
+  <rect x="70" y="250" width="460" height="50" rx="8" fill="rgba(100,100,255,0.1)" stroke="rgba(100,100,255,0.3)"/>
+  <text x="300" y="280" text-anchor="middle" fill="rgba(150,150,255,0.9)" font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="500">Zustand State Store (Telemetry, Chaos, Schema, Builder)</text>
+
+  <!-- API Layer -->
+  <rect x="600" y="100" width="550" height="220" rx="16" fill="url(#cardGrad)" stroke="rgba(255,255,255,0.1)" stroke-width="1" filter="url(#shadow)"/>
+  <text x="620" y="130" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="600" letter-spacing="1">API LAYER</text>
+  <text x="620" y="155" fill="white" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="600">Next.js API Routes</text>
+
+  <!-- API Endpoints -->
+  <rect x="620" y="175" width="160" height="45" rx="6" fill="rgba(0,255,150,0.1)" stroke="rgba(0,255,150,0.3)"/>
+  <text x="700" y="195" text-anchor="middle" fill="rgba(0,255,150,0.9)" font-family="monospace" font-size="10">/api/execute/stream</text>
+  <text x="700" y="210" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="9">SSE Streaming</text>
+
+  <rect x="790" y="175" width="160" height="45" rx="6" fill="rgba(255,200,0,0.1)" stroke="rgba(255,200,0,0.3)"/>
+  <text x="870" y="195" text-anchor="middle" fill="rgba(255,200,0,0.9)" font-family="monospace" font-size="10">/api/schema/discover</text>
+  <text x="870" y="210" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="9">Introspection</text>
+
+  <rect x="960" y="175" width="160" height="45" rx="6" fill="rgba(200,100,255,0.1)" stroke="rgba(200,100,255,0.3)"/>
+  <text x="1040" y="195" text-anchor="middle" fill="rgba(200,100,255,0.9)" font-family="monospace" font-size="10">/api/chat</text>
+  <text x="1040" y="210" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="9">OpenAI GPT-4</text>
+
+  <!-- Execution Engine Box -->
+  <rect x="620" y="235" width="510" height="65" rx="8" fill="rgba(255,100,100,0.1)" stroke="rgba(255,100,100,0.2)"/>
+  <text x="875" y="260" text-anchor="middle" fill="rgba(255,150,150,0.9)" font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="600">Execution Engine</text>
+  <text x="875" y="280" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="Inter, system-ui, sans-serif" font-size="10">Chaos Injection | Transaction Monitor | Telemetry Collector</text>
+
+  <!-- Connection Lines from Frontend to API -->
+  <path d="M 550 210 L 600 210" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-dasharray="5,5"/>
+  <polygon points="595,205 605,210 595,215" fill="rgba(255,255,255,0.3)"/>
+
+  <!-- SSE Arrow -->
+  <path d="M 700 220 L 700 350" stroke="rgba(0,255,150,0.5)" stroke-width="2" filter="url(#glow)"/>
+  <polygon points="695,345 700,355 705,345" fill="rgba(0,255,150,0.5)"/>
+  <text x="710" y="290" fill="rgba(0,255,150,0.7)" font-family="Inter, system-ui, sans-serif" font-size="10">Real-time</text>
+  <text x="710" y="302" fill="rgba(0,255,150,0.7)" font-family="Inter, system-ui, sans-serif" font-size="10">Events</text>
+
+  <!-- Aurora DSQL Section -->
+  <rect x="200" y="380" width="800" height="200" rx="16" fill="url(#cardGrad)" stroke="url(#awsGrad)" stroke-width="2" filter="url(#shadow)"/>
+
+  <!-- AWS Badge -->
+  <rect x="220" y="395" width="80" height="24" rx="4" fill="url(#awsGrad)"/>
+  <text x="260" y="412" text-anchor="middle" fill="white" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700">AWS</text>
+
+  <text x="320" y="412" fill="white" font-family="Inter, system-ui, sans-serif" font-size="20" font-weight="700">Amazon Aurora DSQL</text>
+  <text x="320" y="432" fill="rgba(255,255,255,0.5)" font-family="Inter, system-ui, sans-serif" font-size="12">Distributed SQL with Optimistic Concurrency Control</text>
+
+  <!-- Tables -->
+  <rect x="240" y="460" width="140" height="70" rx="8" fill="rgba(255,153,0,0.1)" stroke="rgba(255,153,0,0.3)"/>
+  <text x="310" y="490" text-anchor="middle" fill="rgba(255,200,100,0.9)" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="500">accounts</text>
+  <text x="310" y="510" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="10">id, balance, updated_at</text>
+
+  <rect x="400" y="460" width="140" height="70" rx="8" fill="rgba(255,153,0,0.1)" stroke="rgba(255,153,0,0.3)"/>
+  <text x="470" y="490" text-anchor="middle" fill="rgba(255,200,100,0.9)" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="500">counters</text>
+  <text x="470" y="510" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="10">id, value, update_count</text>
+
+  <rect x="560" y="460" width="140" height="70" rx="8" fill="rgba(255,153,0,0.1)" stroke="rgba(255,153,0,0.3)"/>
+  <text x="630" y="490" text-anchor="middle" fill="rgba(255,200,100,0.9)" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="500">orders</text>
+  <text x="630" y="510" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="10">id, status, total</text>
+
+  <rect x="720" y="460" width="140" height="70" rx="8" fill="rgba(255,153,0,0.1)" stroke="rgba(255,153,0,0.3)"/>
+  <text x="790" y="490" text-anchor="middle" fill="rgba(255,200,100,0.9)" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="500">users</text>
+  <text x="790" y="510" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="10">id, email, name</text>
+
+  <!-- OCC Badge -->
+  <rect x="880" y="460" width="100" height="70" rx="8" fill="rgba(255,50,50,0.15)" stroke="rgba(255,100,100,0.4)"/>
+  <text x="930" y="490" text-anchor="middle" fill="rgba(255,150,150,0.9)" font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="600">OCC</text>
+  <text x="930" y="508" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="Inter, system-ui, sans-serif" font-size="9">Error 40001</text>
+  <text x="930" y="520" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="Inter, system-ui, sans-serif" font-size="9">on Conflict</text>
+
+  <!-- Connection from API to DSQL -->
+  <path d="M 875 320 L 875 380" stroke="rgba(255,153,0,0.5)" stroke-width="3"/>
+  <polygon points="870,375 875,385 880,375" fill="rgba(255,153,0,0.5)"/>
+
+  <!-- Key Features Section -->
+  <rect x="50" y="620" width="1100" height="130" rx="16" fill="url(#cardGrad)" stroke="rgba(255,255,255,0.1)" stroke-width="1" filter="url(#shadow)"/>
+  <text x="70" y="655" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="600" letter-spacing="1">KEY FEATURES</text>
+
+  <!-- Feature boxes -->
+  <rect x="70" y="675" width="150" height="55" rx="6" fill="rgba(0,255,150,0.08)" stroke="rgba(0,255,150,0.2)"/>
+  <text x="145" y="698" text-anchor="middle" fill="rgba(0,255,150,0.9)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="500">Real-Time SSE</text>
+  <text x="145" y="715" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="9">Live metrics streaming</text>
+
+  <rect x="235" y="675" width="150" height="55" rx="6" fill="rgba(255,100,100,0.08)" stroke="rgba(255,100,100,0.2)"/>
+  <text x="310" y="698" text-anchor="middle" fill="rgba(255,150,150,0.9)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="500">Chaos Engineering</text>
+  <text x="310" y="715" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="9">Latency + Conflicts</text>
+
+  <rect x="400" y="675" width="150" height="55" rx="6" fill="rgba(255,200,0,0.08)" stroke="rgba(255,200,0,0.2)"/>
+  <text x="475" y="698" text-anchor="middle" fill="rgba(255,220,100,0.9)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="500">Schema Discovery</text>
+  <text x="475" y="715" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="9">Auto introspection</text>
+
+  <rect x="565" y="675" width="150" height="55" rx="6" fill="rgba(200,100,255,0.08)" stroke="rgba(200,100,255,0.2)"/>
+  <text x="640" y="698" text-anchor="middle" fill="rgba(220,150,255,0.9)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="500">AI Assistant</text>
+  <text x="640" y="715" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="9">GPT-4 analysis</text>
+
+  <rect x="730" y="675" width="150" height="55" rx="6" fill="rgba(100,150,255,0.08)" stroke="rgba(100,150,255,0.2)"/>
+  <text x="805" y="698" text-anchor="middle" fill="rgba(150,180,255,0.9)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="500">Latency Percentiles</text>
+  <text x="805" y="715" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="9">P50 / P95 / P99</text>
+
+  <rect x="895" y="675" width="150" height="55" rx="6" fill="rgba(255,150,50,0.08)" stroke="rgba(255,150,50,0.2)"/>
+  <text x="970" y="698" text-anchor="middle" fill="rgba(255,180,100,0.9)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="500">Backoff Analysis</text>
+  <text x="970" y="715" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Inter, system-ui, sans-serif" font-size="9">Retry storm detection</text>
+
+  <!-- Footer -->
+  <text x="600" y="780" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Inter, system-ui, sans-serif" font-size="11">H0 Hackathon 2024 | Built with Next.js, Aurora DSQL, OpenAI</text>
+</svg>
